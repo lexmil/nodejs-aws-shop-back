@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1740239949779" clover="3.2.0">
+  <project timestamp="1740239949779" name="All files">
+    <metrics statements="12" coveredstatements="0" conditionals="4" coveredconditionals="0" methods="3" coveredmethods="0" elements="19" coveredelements="0" complexity="0" loc="12" ncloc="12" packages="2" files="2" classes="2"/>
+    <package name="getProductsById">
+      <metrics statements="7" coveredstatements="0" conditionals="4" coveredconditionals="0" methods="2" coveredmethods="0"/>
+      <file name="index.ts" path="/home/lexmil/git/hub/nodejs-aws-shop-backend/lambda/getProductsById/index.ts">
+        <metrics statements="7" coveredstatements="0" conditionals="4" coveredconditionals="0" methods="2" coveredmethods="0"/>
+        <line num="3" count="0" type="stmt"/>
+        <line num="5" count="0" type="stmt"/>
+        <line num="8" count="0" type="stmt"/>
+        <line num="9" count="0" type="stmt"/>
+        <line num="11" count="0" type="stmt"/>
+        <line num="13" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="29" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="getProductsList">
+      <metrics statements="5" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="0"/>
+      <file name="index.ts" path="/home/lexmil/git/hub/nodejs-aws-shop-backend/lambda/getProductsList/index.ts">
+        <metrics statements="5" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="7" count="0" type="stmt"/>
+        <line num="9" count="0" type="stmt"/>
+        <line num="12" count="0" type="stmt"/>
+        <line num="13" count="0" type="stmt"/>
+        <line num="21" count="0" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>
