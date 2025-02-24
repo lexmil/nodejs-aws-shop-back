@@ -1,8 +1,8 @@
 {
-  "name": "nodejs-aws-shop-backend",
+  "name": "nodejs-aws-shop-back",
   "version": "0.1.0",
   "bin": {
-    "nodejs-aws-shop-backend": "bin/nodejs-aws-shop-backend.js"
+    "nodejs-aws-shop-back": "bin/nodejs-aws-shop-back.js"
   },
   "scripts": {
     "build": "tsc",
