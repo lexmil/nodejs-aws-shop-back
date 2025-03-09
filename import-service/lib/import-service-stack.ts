@@ -5,6 +5,7 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3n from "aws-cdk-lib/aws-s3-notifications";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
 
@@ -16,11 +17,25 @@ export class ImportServiceStack extends cdk.Stack {
     const csvBucket = new s3.Bucket(this, "import-service-csv-bucket", {
       cors: [
         {
-          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT],
-          allowedOrigins: ["*"],
           allowedHeaders: ["*"],
+          allowedMethods: [
+            s3.HttpMethods.GET,
+            s3.HttpMethods.POST,
+            s3.HttpMethods.PUT,
+            s3.HttpMethods.DELETE,
+          ],
+          allowedOrigins: ["*"],
         },
       ],
+    });
+
+    // Create empty objects to establish the directory structure
+    new s3deploy.BucketDeployment(this, "csv-bucket-deployment", {
+      sources: [
+        s3deploy.Source.data("uploaded/.keep", ""),
+        s3deploy.Source.data("parsed/.keep", ""),
+      ],
+      destinationBucket: csvBucket,
     });
 
     const nodejsFunctionDefaultOptions = {
