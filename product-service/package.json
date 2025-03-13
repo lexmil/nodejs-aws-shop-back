@@ -4,6 +4,9 @@
   "bin": {
     "nodejs-aws-shop-back": "bin/nodejs-aws-shop-back.js"
   },
+  "imports": {
+    "@*": "./src/*"
+  },
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
