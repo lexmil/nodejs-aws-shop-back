@@ -12,64 +12,84 @@ const dynamodb = DynamoDBDocumentClient.from(client);
 
 export const handler = async (event: SQSEvent): Promise<void> => {
   try {
-    const products = event.Records.map((record) => JSON.parse(record.body));
+    logger.info("Processing batch:", { event });
 
-    logger.info("Parsing", {
-      tableName: process.env.PRODUCTS_TABLE,
-      products,
-    });
+    // Process each record individually
+    for (const record of event.Records) {
+      try {
+        // Parse the individual record
+        const product = JSON.parse(record.body);
+        logger.info("Processing product:", { product });
 
-    const productsList = [];
-    const productId = uuidv4();
+        // Generate a unique ID for each product
+        const productId = uuidv4();
 
-    for (const product of products) {
-      const productData = JSON.parse(product.body);
-      // Create product in products table
-      await dynamodb.send(
-        new PutCommand({
-          TableName: process.env.PRODUCTS_TABLE,
-          Item: {
-            id: productId,
-            title: productData.title,
-            description: productData.description || "",
-            price: productData.price,
-          },
-        }),
-      );
+        // Create product in products table
+        await dynamodb.send(
+          new PutCommand({
+            TableName: process.env.PRODUCTS_TABLE,
+            Item: {
+              id: productId,
+              title: product.title,
+              description: product.description || "",
+              price: product.price,
+            },
+          }),
+        );
 
-      // Create stock in stocks table
-      await dynamodb.send(
-        new PutCommand({
-          TableName: process.env.STOCKS_TABLE,
-          Item: {
-            product_id: productId,
-            count: productData.count,
-          },
-        }),
-      );
+        // Create stock in stocks table
+        await dynamodb.send(
+          new PutCommand({
+            TableName: process.env.STOCKS_TABLE,
+            Item: {
+              product_id: productId,
+              count: product.count,
+            },
+          }),
+        );
 
-      productsList.push(productData);
-      logger.info(`Product created: ${JSON.stringify(product)}`);
+        try {
+          logger.info("Attempting to publish to SNS", {
+            topicArn: process.env.SNS_TOPIC_ARN,
+            product: product,
+          });
+
+          const snsResponse = await sns.publish({
+            TopicArn: process.env.SNS_TOPIC_ARN,
+            Subject: "New Product Created",
+            Message: JSON.stringify({
+              message:
+                product.price >= 100
+                  ? "New premium product added to catalog"
+                  : "New product added to catalog",
+              product: {
+                id: product.id,
+                title: product.title,
+                price: product.price,
+              },
+            }),
+          });
+
+          logger.info("Successfully published to SNS", {
+            messageId: snsResponse.MessageId,
+            topicArn: process.env.SNS_TOPIC_ARN,
+          });
+        } catch (snsError) {
+          logger.error("Failed to publish to SNS", {
+            error: snsError,
+            topicArn: process.env.SNS_TOPIC_ARN,
+            product: product,
+          });
+          throw snsError;
+        }
+      } catch (error) {
+        logger.error("Error processing individual record:", {
+          error,
+          record: record.body,
+        });
+        // You might want to throw here depending on your error handling strategy
+      }
     }
-
-    await sns.publish({
-      TopicArn: process.env.SNS_TOPIC_ARN,
-      Subject: "New products",
-      Message: JSON.stringify({
-        message: "These product have been created",
-        productsList,
-      }),
-      MessageAttributes: {
-        createdProductsLength: {
-          DataType: "Number",
-          StringValue: productsList.length.toString(),
-        },
-        status: {
-          DataType: "String",
-          StringValue: "success",
-        },
-      },
-    });
   } catch (error) {
     logger.error("Error processing batch:", { error });
     throw error;

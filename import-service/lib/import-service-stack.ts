@@ -13,19 +13,17 @@ import { Construct } from "constructs";
 
 dotenv.config({ path: "../.env" });
 
+const IMPORT_SERVICE_QUEUE_NAME = process.env.IMPORT_SERVICE_QUEUE_NAME;
+
 export class ImportServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
-    const IMPORT_SERVICE_QUEUE_NAME = process.env.IMPORT_SERVICE_QUEUE_NAME;
 
     if (!IMPORT_SERVICE_QUEUE_NAME) {
       throw new Error(
         "IMPORT_SERVICE_QUEUE_NAME environment variable is not set",
       );
     }
-
-    console.log("SQS ", IMPORT_SERVICE_QUEUE_NAME, " created");
 
     // Create S3 bucket for storing uploaded CSV files
     const csvBucket = new s3.Bucket(this, "import-service-csv-bucket", {
@@ -54,7 +52,7 @@ export class ImportServiceStack extends cdk.Stack {
 
     const catalogItemsQueue = Queue.fromQueueAttributes(
       this,
-      "ImportServiceQueue",
+      "import-service-queue",
       {
         queueName: IMPORT_SERVICE_QUEUE_NAME,
         queueArn: `arn:aws:sqs:${this.region}:${this.account}:${IMPORT_SERVICE_QUEUE_NAME}`,

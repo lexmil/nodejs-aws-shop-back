@@ -50,7 +50,7 @@ export class NodejsAwsShopBackendStack extends cdk.Stack {
     });
 
     const createProductTopic = new Topic(this, "CreateProductTopic", {
-      topicName: "createProductTopic",
+      topicName: "CreateProductTopic",
     });
 
     // Add email subscription
@@ -58,7 +58,7 @@ export class NodejsAwsShopBackendStack extends cdk.Stack {
       new EmailSubscription("a.milashchenkov@softteco.com", {
         filterPolicy: {
           price: SubscriptionFilter.numericFilter({
-            greaterThanOrEqualTo: 100,
+            greaterThanOrEqualTo: 500,
           }),
         },
       }),
@@ -67,7 +67,7 @@ export class NodejsAwsShopBackendStack extends cdk.Stack {
       new EmailSubscription("encode.cpp@gmail.com", {
         filterPolicy: {
           price: SubscriptionFilter.numericFilter({
-            lessThanOrEqualTo: 100,
+            lessThanOrEqualTo: 500,
           }),
         },
       }),

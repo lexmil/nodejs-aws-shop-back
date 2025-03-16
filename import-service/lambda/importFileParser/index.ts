@@ -12,6 +12,7 @@ import { Readable } from "stream";
 import * as dotenv from "dotenv";
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
+const sqs = new SQS();
 const logger = new Logger({ serviceName: "importFileParser" });
 
 dotenv.config({ path: "../.env" });
@@ -56,8 +57,6 @@ async function moveFile(bucket: string, sourceKey: string): Promise<void> {
 
 export const handler = async (event: S3Event): Promise<void> => {
   try {
-    const sqs = new SQS();
-
     for (const record of event.Records) {
       const bucket = record.s3.bucket.name;
       const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
@@ -76,21 +75,21 @@ export const handler = async (event: S3Event): Promise<void> => {
         await new Promise((resolve, reject) => {
           Body.pipe(csvParser())
             .on("data", async (data) => {
-              try {
-                await sqs.sendMessage({
-                  QueueUrl: process.env.SQS_QUEUE_URL,
-                  MessageBody: JSON.stringify(data),
-                });
-              } catch (error) {
-                logger.error("Error sending message to SQS:", { error });
-              }
+              logger.info(`Data chunk: ${JSON.stringify(data)}`);
 
-              logger.info("Processing CSV row:", { data });
+              await sqs.sendMessage({
+                QueueUrl: process.env.SQS_QUEUE_URL,
+                MessageBody: JSON.stringify(data),
+              });
             })
             .on("end", async () => {
               try {
-                // After processing is complete, move the file
                 await moveFile(bucket, key);
+
+                logger.info(
+                  `Successfully sent message to SQS and moved file ${key} to parsed folder`,
+                );
+
                 resolve(null);
               } catch (error) {
                 reject(error);
