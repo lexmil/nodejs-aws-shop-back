@@ -4,7 +4,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as nodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
-import { Topic, SubscriptionFilter } from "aws-cdk-lib/aws-sns";
+import * as sns from "aws-cdk-lib/aws-sns";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { EmailSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
@@ -49,24 +49,23 @@ export class NodejsAwsShopBackendStack extends cdk.Stack {
       queueName: IMPORT_SERVICE_QUEUE_NAME,
     });
 
-    const createProductTopic = new Topic(this, "CreateProductTopic", {
-      topicName: "CreateProductTopic",
-    });
+    const createProductTopic = new sns.Topic(this, "CreateProductTopic");
 
     // Add email subscription
     createProductTopic.addSubscription(
-      new EmailSubscription("a.milashchenkov@softteco.com", {
+      new EmailSubscription(process.env.TEST_EMAIL_1 as string, {
         filterPolicy: {
-          price: SubscriptionFilter.numericFilter({
+          price: sns.SubscriptionFilter.numericFilter({
             greaterThanOrEqualTo: 500,
           }),
         },
       }),
     );
+
     createProductTopic.addSubscription(
-      new EmailSubscription("encode.cpp@gmail.com", {
+      new EmailSubscription(process.env.TEST_EMAIL_2 as string, {
         filterPolicy: {
-          price: SubscriptionFilter.numericFilter({
+          price: sns.SubscriptionFilter.numericFilter({
             lessThanOrEqualTo: 500,
           }),
         },
@@ -80,6 +79,7 @@ export class NodejsAwsShopBackendStack extends cdk.Stack {
         runtime: lambda.Runtime.NODEJS_20_X,
         handler: "index.handler",
         entry: path.join(__dirname, "../lambda/catalogBatchProcess/index.ts"),
+        timeout: cdk.Duration.seconds(30),
         bundling: {
           externalModules: [],
           minify: true,
