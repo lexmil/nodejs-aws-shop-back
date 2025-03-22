@@ -1,44 +1,56 @@
 import csvParser from "csv-parser";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { S3Event } from "aws-lambda";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { SQS } from "@aws-sdk/client-sqs";
+import {
+  S3Client,
+  GetObjectCommand,
+  CopyObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { Readable } from "stream";
-import { S3 } from 'aws-sdk';
+import * as dotenv from "dotenv";
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
+const sqs = new SQS();
 const logger = new Logger({ serviceName: "importFileParser" });
-const s3 = new S3();
+
+dotenv.config({ path: "../.env" });
 
 async function moveFile(bucket: string, sourceKey: string): Promise<void> {
   try {
     // Ensure we're only moving files from the uploaded directory
-    if (!sourceKey.startsWith('uploaded/')) {
-      logger.error('File is not in the uploaded directory');
+    if (!sourceKey.startsWith("uploaded/")) {
+      logger.error("File is not in the uploaded directory");
     }
 
     // Construct the new key for parsed folder
-    const parsedKey = sourceKey.replace('uploaded/', 'parsed/');
+    const parsedKey = sourceKey.replace("uploaded/", "parsed/");
 
     logger.info(`Moving file from ${sourceKey} to ${parsedKey}`);
 
     // Copy the file to the parsed directory
-    await s3.copyObject({
-      Bucket: bucket,
-      CopySource: `${bucket}/${sourceKey}`,
-      Key: parsedKey
-    }).promise();
+    await s3Client.send(
+      new CopyObjectCommand({
+        Bucket: bucket,
+        CopySource: `${bucket}/${sourceKey}`,
+        Key: parsedKey,
+      }),
+    );
 
     logger.info(`Successfully copied file to ${parsedKey}`);
 
     // Delete the original file from uploaded directory
-    await s3.deleteObject({
-      Bucket: bucket,
-      Key: sourceKey
-    }).promise();
+    await s3Client.send(
+      new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: sourceKey,
+      }),
+    );
 
     logger.info(`Successfully deleted original file from ${sourceKey}`);
   } catch (error) {
-    logger.error('Error moving file:', { error });
+    logger.error("Error moving file:", { error });
     throw error;
   }
 }
@@ -56,34 +68,41 @@ export const handler = async (event: S3Event): Promise<void> => {
         new GetObjectCommand({
           Bucket: bucket,
           Key: key,
-        })
+        }),
       );
 
       if (Body instanceof Readable) {
-        // Process your CSV data here
         await new Promise((resolve, reject) => {
           Body.pipe(csvParser())
-            .on('data', (data) => {
-              // Process each row of CSV data
-              logger.info('Processing CSV row:', { data });
+            .on("data", async (data) => {
+              logger.info(`Data chunk: ${JSON.stringify(data)}`);
+
+              await sqs.sendMessage({
+                QueueUrl: process.env.SQS_QUEUE_URL,
+                MessageBody: JSON.stringify(data),
+              });
             })
-            .on('end', async () => {
+            .on("end", async () => {
               try {
-                // After processing is complete, move the file
                 await moveFile(bucket, key);
+
+                logger.info(
+                  `Successfully sent message to SQS and moved file ${key} to parsed folder`,
+                );
+
                 resolve(null);
               } catch (error) {
                 reject(error);
               }
             })
-            .on('error', (error) => {
+            .on("error", (error) => {
               reject(error);
             });
         });
       }
     }
   } catch (error) {
-    logger.error('Error in handler:', { error });
+    logger.error("Error in handler:", { error });
     throw error;
   }
 };
