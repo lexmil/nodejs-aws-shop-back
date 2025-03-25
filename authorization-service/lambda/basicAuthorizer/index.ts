@@ -1,54 +1,52 @@
-// src/functions/basicAuthorizer/handler.ts
-
+// In your authorization service lambda (basicAuthorizer)
 export const handler = async (event: any) => {
-  console.log("Event: ", JSON.stringify(event));
-
-  // Extract authorization header
-  const { authorizationToken, methodArn } = event;
-
-  if (!authorizationToken) {
-    return generatePolicy("user", "Deny", methodArn);
-  }
+  console.log("Event: ", event);
 
   try {
-    // Remove "Basic " from the token
-    const token = authorizationToken.replace("Basic ", "");
-    // Decode base64
-    const credentials = Buffer.from(token, "base64").toString("utf-8");
+    const { authorizationToken, methodArn } = event;
 
-    // TODO :: remove log
-    console.log("Credentials: ", credentials);
+    // If no token provided or wrong format
+    if (
+      !authorizationToken ||
+      !authorizationToken.toLowerCase().startsWith("basic ")
+    ) {
+      throw new Error("Unauthorized"); // This will trigger 401
+    }
 
-    const [username, password] = credentials.split(":");
+    const encodedCreds = authorizationToken.split(" ")[1];
+    const buff = Buffer.from(encodedCreds, "base64");
+    const plainCreds = buff.toString("utf-8").split(":");
+    const username = plainCreds[0];
+    const password = plainCreds[1];
 
-    // Get credentials from environment variables
-    const storedCredentials = process.env[username];
+    console.log(`username: ${username}`);
 
-    const effect =
-      !storedCredentials || storedCredentials !== password ? "Deny" : "Allow";
+    const storedUserName = process.env.LOGIN;
+    const storedPassword = process.env.PASSWORD;
 
-    return generatePolicy("user", effect, methodArn);
+    // Check credentials
+    if (username !== storedUserName || password !== storedPassword) {
+      throw new Error("Unauthorized"); // This will trigger 401
+    }
+
+    // If credentials are valid, return Allow policy
+    return {
+      principalId: username,
+      policyDocument: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Action: "execute-api:Invoke",
+            Effect: "Allow",
+            Resource: methodArn,
+          },
+        ],
+      },
+    };
   } catch (error) {
-    return generatePolicy("user", "Deny", methodArn);
-  }
-};
+    console.error("Authorization error:", error);
 
-const generatePolicy = (
-  principalId: string,
-  effect: string,
-  resource: string,
-) => {
-  return {
-    principalId,
-    policyDocument: {
-      Version: "2012-10-17",
-      Statement: [
-        {
-          Action: "execute-api:Invoke",
-          Effect: effect,
-          Resource: resource,
-        },
-      ],
-    },
-  };
+    // Instead of returning a policy, throw an error to trigger 401
+    throw new Error("Unauthorized");
+  }
 };

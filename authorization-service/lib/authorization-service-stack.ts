@@ -11,20 +11,31 @@ export class AuthorizationServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const USERNAME = process.env.USERNAME || "";
+    const LOGIN = process.env.USERNAME || "";
     const PASSWORD = process.env.PASSWORD || "";
 
-    new NodejsFunction(this, "BasicAuthorizer", {
-      runtime: lambda.Runtime.NODEJS_18_X,
-      handler: "lambda/basicAuthorizer/index.handler",
-      entry: path.join(__dirname, "../lambda/basicAuthorizer/index.ts"),
-      environment: {
-        [USERNAME]: PASSWORD,
+    const basicAuthorizerFunction = new NodejsFunction(
+      this,
+      "BasicAuthorizer",
+      {
+        functionName: "basicAuthorizer",
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: "index.handler",
+        entry: path.join(__dirname, "../lambda/basicAuthorizer/index.ts"),
+        environment: {
+          LOGIN,
+          PASSWORD,
+        },
+        bundling: {
+          minify: true,
+          sourceMap: false,
+        },
       },
-      bundling: {
-        minify: true,
-        sourceMap: false,
-      },
+    );
+
+    new cdk.CfnOutput(this, "ARN", {
+      value: basicAuthorizerFunction.functionArn,
+      exportName: "BasicAuthorizerLambdaArn",
     });
   }
 }

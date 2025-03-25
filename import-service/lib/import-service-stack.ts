@@ -11,6 +11,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
+import { ResponseType } from "aws-cdk-lib/aws-apigateway";
 
 dotenv.config({ path: "../.env" });
 
@@ -20,7 +21,7 @@ export class ImportServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const basicAuthorizerArn = `arn:aws:lambda:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:function:basicAuthorizer`;
+    const basicAuthorizerArn = `arn:aws:lambda:${this.region}:${this.account}:function:basicAuthorizer`;
 
     // Import the authorizer function using constructed ARN
     const basicAuthorizer = lambda.Function.fromFunctionArn(
@@ -138,8 +139,8 @@ export class ImportServiceStack extends cdk.Stack {
     );
 
     // Create API Gateway
-    const api = new apigateway.RestApi(this, "ImportApi", {
-      restApiName: "Import Service",
+    const api = new apigateway.RestApi(this, "ImportServiceApi", {
+      restApiName: "Import Service API",
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
@@ -153,24 +154,47 @@ export class ImportServiceStack extends cdk.Stack {
       },
     });
 
-    // Add resource and method
+    const importResource = api.root.addResource("import");
 
-    const defaultErrorResponse = {
-      responseModels: {
-        "application/json": apigateway.Model.ERROR_MODEL,
-      },
-      responseHeaders: {
-        "Access-Control-Allow-Origin": "'*'",
-      },
+    const headers = {
+      "Access-Control-Allow-Origin": "'*'",
+      "Access-Control-Allow-Headers": "'Content-Type,Authorization'",
     };
 
-    const importResource = api.root.addResource("import");
+    api.addGatewayResponse("Unauthorized", {
+      type: ResponseType.UNAUTHORIZED,
+      statusCode: "401",
+      responseHeaders: headers,
+      templates: {
+        "application/json": '{"message": "Unauthorized", "statusCode": 401}',
+      },
+    });
+
+    api.addGatewayResponse("MissingAuthenticationToken", {
+      type: ResponseType.MISSING_AUTHENTICATION_TOKEN,
+      responseHeaders: headers,
+      statusCode: "401",
+      templates: {
+        "application/json":
+          '{"message": "Missing authentication token", "statusCode": 401}',
+      },
+    });
+
+    api.addGatewayResponse("Forbidden", {
+      type: apigateway.ResponseType.ACCESS_DENIED,
+      statusCode: "403",
+      responseHeaders: headers,
+      templates: {
+        "application/json": '{"message": "Access Denied", "statusCode": 403}',
+      },
+    });
+
     importResource.addMethod(
       "GET",
       new apigateway.LambdaIntegration(importProductsFile),
       {
-        authorizationType: apigateway.AuthorizationType.CUSTOM,
         authorizer: authorizer,
+        authorizationType: apigateway.AuthorizationType.CUSTOM,
         requestParameters: {
           "method.request.querystring.name": true,
         },
@@ -180,21 +204,18 @@ export class ImportServiceStack extends cdk.Stack {
             responseParameters: {
               "method.response.header.Access-Control-Allow-Origin": true,
             },
-            responseModels: {
-              "application/json": apigateway.Model.EMPTY_MODEL,
-            },
-          },
-          {
-            statusCode: "400",
-            ...defaultErrorResponse,
           },
           {
             statusCode: "401",
-            ...defaultErrorResponse,
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
           },
           {
             statusCode: "403",
-            ...defaultErrorResponse,
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Origin": true,
+            },
           },
         ],
       },
